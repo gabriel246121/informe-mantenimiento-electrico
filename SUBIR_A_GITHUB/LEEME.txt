@@ -1,0 +1,25 @@
+APP - INFORME DIARIO DE MANTENIMIENTO ELECTRICO
+================================================
+
+EN LA PC
+  Abre index.html (doble clic, en Chrome o Edge) -> llena el dia -> "Descargar Excel".
+
+EN EL CELULAR (despues de subirla a GitHub Pages)
+  Abre el enlace https://TU_USUARIO.github.io/informe-mantenimiento-electrico/
+  Chrome (Android): menu ⋮ -> "Agregar a pantalla principal" / "Instalar app".
+  Safari (iPhone):  boton Compartir -> "Agregar a inicio".
+  Queda como app con su icono y funciona sin senal despues de abrirla una vez.
+
+FIRMA
+  La firma NO esta en el codigo (para que no quede publica en GitHub).
+  En la app: seccion "Firmas" -> "Cargar imagen de firma" -> elige NO_SUBIR/firma_administrador.jpeg
+  Se guarda solo en ese dispositivo. Hazlo una vez en la PC y una vez en el celular.
+
+CARPETA NO_SUBIR/
+  Tiene la firma y el informe de ejemplo (con fotos reales). Esta en .gitignore: Git no la sube.
+
+HACER CAMBIOS
+  1. Edita src/gen.js (formato del Excel) o src/index.src.html (formulario).
+  2. Terminal:  python build.py
+  3. En sw.js cambia VERSION (informe-v1 -> informe-v2) para que el celular tome la nueva version.
+  4. git add .  /  git commit -m "cambio"  /  git push
