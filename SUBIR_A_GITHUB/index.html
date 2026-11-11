@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Informe diario de mantenimiento eléctrico</title>
-<meta name="theme-color" content="#2f5597">
+<meta name="theme-color" content="#0b2547">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Informe Mantto">
+<meta name="apple-mobile-web-app-title" content="Supervisor">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
   :root{
     --bg:#f4f6f9; --card:#fff; --ink:#1c2430; --muted:#667085; --line:#dfe3ea;
@@ -249,7 +249,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       }
     }
     const a = s.align || {};
-    const ind = (a.h === 'left' || a.h === 'right') ? ' indent="1"' : '';
+    const ind = (a.h === 'left' || a.h === 'right' || a.h === 'justify') ? ' indent="1"' : '';
     const alignXml = (a.h || a.v || a.wrap) ? `<alignment${a.h ? ` horizontal="${a.h}"` : ''}${a.v ? ` vertical="${a.v}"` : ''}${a.wrap ? ' wrapText="1"' : ''}${ind}/>` : '';
     const xf = `<xf numFmtId="${numFmtId}" fontId="${fontId}" fillId="${fillId}" borderId="${borderId}" xfId="0"${numFmtId ? ' applyNumberFormat="1"' : ''} applyFont="1"${fillId ? ' applyFill="1"' : ''}${borderId ? ' applyBorder="1"' : ''}${alignXml ? ' applyAlignment="1">' + alignXml + '</xf>' : '/>'}`;
     this.xfs.push(xf);
@@ -352,6 +352,11 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         if (c.f) sd += `<c r="${ref}" s="${s}"><f>${esc(c.f)}</f>${c.v != null ? `<v>${c.v}</v>` : ''}</c>`;
         else if (c.v == null || c.v === '') sd += `<c r="${ref}" s="${s}"/>`;
         else if (typeof c.v === 'number') sd += `<c r="${ref}" s="${s}"><v>${c.v}</v></c>`;
+        else if (typeof c.v === 'object' && c.v.rich) {
+          const f = (c.s && c.s.font) || {};
+          const runs = c.v.rich.map((run) => `<r><rPr>${run.b || f.b ? '<b/>' : ''}<sz val="${f.sz || 10}"/><color theme="1"/><rFont val="${f.name || 'Arial'}"/><family val="2"/></rPr><t xml:space="preserve">${esc(run.t)}</t></r>`).join('');
+          sd += `<c r="${ref}" s="${s}" t="inlineStr"><is>${runs}</is></c>`;
+        }
         else sd += `<c r="${ref}" s="${s}" t="inlineStr"><is><t xml:space="preserve">${esc(c.v)}</t></is></c>`;
       });
       sd += '</row>';
@@ -394,12 +399,26 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     time: { font: { b: true, sz: 9 }, border: ALL, align: { h: 'center', v: 'center' }, fmt: 'h:mm' },
     pct: { font: { b: true, sz: 9 }, border: ALL, align: { h: 'center', v: 'center' }, fmt: '0%' },
     num: { font: { sz: 9 }, border: ALL, align: { h: 'center', v: 'center' }, fmt: '0.00' },
-    ptitle: { font: { b: true, sz: 10 }, border: ALL, align: { h: 'center', v: 'center', wrap: true } },
-    ptext: { font: { sz: 10 }, border: ALL, align: { h: 'left', v: 'top', wrap: true } },
+    ptitle18: { font: { b: true, sz: 18 }, border: ALL, align: { h: 'center', v: 'center', wrap: true } },
+    ptitle16: { font: { b: true, sz: 16 }, border: ALL, align: { h: 'center', v: 'center', wrap: true } },
+    ptext: { font: { sz: 13 }, border: ALL, align: { h: 'justify', v: 'top', wrap: true } },
     pbox: { border: { l: 'thin', r: 'thin' } },
     firmaH: { font: { b: true, sz: 9 }, fill: AZUL, border: { l: 'medium', r: 'medium', t: 'medium', b: 'medium' }, align: { h: 'center', v: 'center' } },
     firmaB: { font: { sz: 9 }, border: { l: 'medium', r: 'medium', t: 'medium', b: 'medium' }, align: { h: 'center', v: 'bottom' } },
   };
+
+  // Convierte **negrita** en tramos de texto enriquecido
+  function richText(txt) {
+    const partes = String(txt).split(/(\*\*[^*]+\*\*)/g).filter((x) => x !== '');
+    if (!partes.some((x) => /^\*\*[^*]+\*\*$/.test(x))) return txt;
+    return { rich: partes.map((x) => /^\*\*[^*]+\*\*$/.test(x) ? { t: x.slice(2, -2), b: true } : { t: x }) };
+  }
+  // Líneas que ocupa un texto con letra de 'sz' pt en el ancho del panel (D:P)
+  function lineasPanel(texto, sz) {
+    const anchoPt = AREA_PX * 0.75 - 24;               // ancho útil menos márgenes
+    const porLinea = Math.floor(anchoPt / (sz * 0.53)); // ancho medio de carácter en Arial (conservador)
+    return String(texto || '').replace(/\*\*/g, '').split(/\n/).reduce((s, p) => s + Math.max(1, Math.ceil(p.length / porLinea)), 0);
+  }
 
   function estimaAlto(texto, ptPorLinea, charsPorLinea, min) {
     const lineas = String(texto || '').split(/\n/).reduce((s, p) => s + Math.max(1, Math.ceil(p.length / charsPorLinea)), 0);
@@ -476,8 +495,10 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     sh.box('D', r, 'P', r, 'PANEL FOTOGRAFICO', S.head); r++;
     (d.panel || []).forEach((p, i) => {
       const b0 = r;
-      sh.h(r, estimaAlto(p.titulo, 14, 150, 22));
-      sh.box('D', r, 'P', r, `ACTIVIDAD ${i + 1}: ${String(p.titulo || '').toUpperCase()}`, S.ptitle); r++;
+      const tit = `ACTIVIDAD ${i + 1}: ${String(p.titulo || '').toUpperCase()}`;
+      const tsz = tit.length <= 60 ? 18 : 16;             // título corto = 18, largo = 16
+      sh.h(r, Math.min(409, lineasPanel(tit, tsz * 1.12) * tsz * 1.35 + 14));
+      sh.box('D', r, 'P', r, tit, tsz === 18 ? S.ptitle18 : S.ptitle16); r++;
       const fotos = (p.fotos || []).filter(Boolean);
       const n = fotos.length;
       if (n) {
@@ -499,9 +520,14 @@ https://github.com/nodeca/pako/blob/main/LICENSE
           r++;
         }
       }
+      // Redacción: alto según el largo del texto. Excel limita cada fila a 409 pt,
+      // así que si hace falta más el recuadro se extiende sobre varias filas combinadas.
       const txt = String(p.texto || '').trim();
-      sh.h(r, estimaAlto(txt, 14, 190, 40));
-      sh.box('D', r, 'P', r, txt, S.ptext); r++;
+      const szT = S.ptext.font.sz;
+      const altoTxt = Math.max(70, lineasPanel(txt, szT) * szT * 1.3 + 24);
+      const nFil = Math.ceil(altoTxt / 400);
+      for (let k = 0; k < nFil; k++) sh.h(r + k, Math.ceil(altoTxt / nFil));
+      sh.box('D', r, 'P', r + nFil - 1, txt ? richText(txt) : '', S.ptext); r += nFil;
       sh.blocks.push([b0 === r0Panel + 1 ? r0Panel : b0, r - 1]);
     });
     sh.h(r, 6); r++;
@@ -897,7 +923,8 @@ function renderForm(){
           </select></label>
         <span class="hint">${p.fotos.length} foto(s)</span>
       </div>
-      <textarea data-k="panel.${i}.texto" placeholder="Redacción: describe el trabajo realizado...">${esc(p.texto)}</textarea>
+      <textarea data-k="panel.${i}.texto" style="min-height:150px" placeholder="Redacción: describe el trabajo realizado...">${esc(p.texto)}</textarea>
+      <div class="hint">Para poner algo en <b>negrita</b> escríbelo entre dos asteriscos: <code>**energía cero**</code>. El recuadro del Excel crece según el largo del texto.</div>
     </div>`).join('')}
     <button class="btn small" data-act="add" data-l="panel">＋ Bloque de fotos</button>
     <button class="btn small" data-act="panelDesdeAct" title="Crea un bloque por cada actividad de mañana y tarde que aún no tenga uno">Crear bloques desde las actividades</button>
