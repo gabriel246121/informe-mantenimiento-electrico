@@ -158,6 +158,13 @@
   }
   const AREA_PX = (() => { let s = 0; for (let c = colIdx('D'); c <= colIdx('P'); c++) s += colPx(colLetter(c)); return s; })();
 
+  // Foto anclada a celdas (twoCell): si el usuario agranda la fila o columnas en Excel, la foto se estira con ellas
+  Sheet.prototype.imageCell = function (img, xPx, row, yPx, wPx, hPx) {
+    const a = locateX(xPx), b = locateX(xPx + wPx);
+    const bOff = Math.min(b.off, colPx(colLetter(b.col)) - 1);
+    this.images.push({ two: true, data: img.data, ext: img.ext, col: a.col, colOff: a.off * PX, row: row - 1, rowOff: Math.round(yPx) * PX,
+      col2: b.col, colOff2: Math.max(0, bOff) * PX, row2: row - 1, rowOff2: Math.round(yPx + hPx) * PX, cx: Math.round(wPx) * PX, cy: Math.round(hPx) * PX });
+  };
   Sheet.prototype.image = function (img, xPx, row, yPx, wPx, hPx) {
     const loc = locateX(xPx);
     this.images.push({ data: img.data, ext: img.ext, col: loc.col, colOff: loc.off * PX, row: row - 1, rowOff: Math.round(yPx) * PX, cx: Math.round(wPx) * PX, cy: Math.round(hPx) * PX });
@@ -347,23 +354,38 @@
       const fotos = (p.fotos || []).filter(Boolean);
       const n = fotos.length;
       if (n) {
-        const porFila = Math.max(1, Math.min(n, +p.porFila || (n <= 4 ? n : (n <= 6 ? 3 : 4))));
-        const altoPt = +p.altoFila || 240;
-        const altoPx = altoPt * 4 / 3;
-        const slotW = AREA_PX / porFila;
-        for (let k = 0; k < n; k += porFila) {
-          sh.h(r, altoPt);
-          sh.box('D', r, 'P', r, null, S.pbox);
-          const fila = fotos.slice(k, k + porFila);
-          const ancho = slotW * fila.length, x0 = (AREA_PX - ancho) / 2; // centra filas incompletas
-          fila.forEach((f, j) => {
-            const m = 6;
-            const sc = Math.min((slotW - 2 * m) / f.w, (altoPx - 2 * m) / f.h);
-            const iw = f.w * sc, ih = f.h * sc;
-            sh.image(f, x0 + j * slotW + (slotW - iw) / 2, r, (altoPx - ih) / 2, iw, ih);
-          });
-          r++;
+        // Recuadro de fotos de ALTO FIJO (una sola fila de Excel). Todas las fotos se acomodan dentro,
+        // sin importar cuántas sean: se elige la cuadrícula (columnas x filas) que mejor llena el espacio.
+        const altoPt = +p.altoFila || 400;               // máximo de Excel por fila: 409
+        const AH = altoPt * 4 / 3, AW = AREA_PX;
+        let cols = +p.porFila;
+        if (!cols) {
+          let mejor = 1, pts = 1e9;
+          for (let c = 1; c <= n; c++) {
+            const filas = Math.ceil(n / c), vacios = filas * c - n;
+            const prop = (AW / c) / (AH / filas);              // forma de cada casilla (ancho/alto)
+            const sc = vacios * 0.8 + Math.abs(Math.log(prop / 1.25)) * 2;
+            if (sc < pts) { pts = sc; mejor = c; }
+          }
+          cols = mejor;
         }
+        cols = Math.max(1, Math.min(n, cols));
+        const filas = Math.ceil(n / cols);
+        const cw = AW / cols, ch = AH / filas, m = 2;
+        const rellenar = p.ajuste !== 'proporcion';
+        sh.h(r, altoPt);
+        sh.box('D', r, 'P', r, null, S.pbox);
+        fotos.forEach((f, idx) => {
+          const fi = Math.floor(idx / cols), enFila = Math.min(cols, n - fi * cols);
+          const x0 = (AW - enFila * cw) / 2;                // la última fila incompleta va centrada
+          const cx = x0 + (idx % cols) * cw, cy = fi * ch;
+          if (rellenar) sh.imageCell(f, cx + m, r, cy + m, cw - 2 * m, ch - 2 * m);
+          else {
+            const k = Math.min((cw - 2 * m) / f.w, (ch - 2 * m) / f.h), iw = f.w * k, ih = f.h * k;
+            sh.imageCell(f, cx + (cw - iw) / 2, r, cy + (ch - ih) / 2, iw, ih);
+          }
+        });
+        r++;
       }
       // Redacción: alto según el largo del texto. Excel limita cada fila a 409 pt,
       // así que si hace falta más el recuadro se extiende sobre varias filas combinadas.
@@ -557,10 +579,12 @@
           const file = `image${imgN}.${im.ext}`;
           zip.file(`xl/media/${file}`, im.data);
           rels += `<Relationship Id="rId${k + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/${file}"/>`;
-          dr += `<xdr:oneCellAnchor><xdr:from><xdr:col>${im.col}</xdr:col><xdr:colOff>${im.colOff}</xdr:colOff><xdr:row>${im.row}</xdr:row><xdr:rowOff>${im.rowOff}</xdr:rowOff></xdr:from>` +
-            `<xdr:ext cx="${im.cx}" cy="${im.cy}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${k + 2}" name="Imagen ${k + 1}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>` +
+          const pic = `<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${k + 2}" name="Imagen ${k + 1}"/><xdr:cNvPicPr>${im.two ? '' : '<a:picLocks noChangeAspect="1"/>'}</xdr:cNvPicPr></xdr:nvPicPr>` +
             `<xdr:blipFill><a:blip r:embed="rId${k + 1}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>` +
-            `<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${im.cx}" cy="${im.cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>`;
+            `<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${im.cx}" cy="${im.cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/>`;
+          const from = `<xdr:from><xdr:col>${im.col}</xdr:col><xdr:colOff>${im.colOff}</xdr:colOff><xdr:row>${im.row}</xdr:row><xdr:rowOff>${im.rowOff}</xdr:rowOff></xdr:from>`;
+          if (im.two) dr += `<xdr:twoCellAnchor editAs="twoCell">${from}<xdr:to><xdr:col>${im.col2}</xdr:col><xdr:colOff>${im.colOff2}</xdr:colOff><xdr:row>${im.row2}</xdr:row><xdr:rowOff>${im.rowOff2}</xdr:rowOff></xdr:to>${pic}</xdr:twoCellAnchor>`;
+          else dr += `<xdr:oneCellAnchor>${from}<xdr:ext cx="${im.cx}" cy="${im.cy}"/>${pic}</xdr:oneCellAnchor>`;
         });
         dr += '</xdr:wsDr>'; rels += '</Relationships>';
         zip.file(`xl/drawings/drawing${n}.xml`, dr);

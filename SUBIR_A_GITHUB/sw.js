@@ -1,6 +1,6 @@
 // Permite usar la app sin internet despues de abrirla una vez.
 // Cambia la version cada vez que publiques cambios para que el celular descargue la nueva.
-const VERSION = 'informe-v2';
+const VERSION = 'informe-v4';
 const ARCHIVOS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './icon-maskable-192.png', './icon-maskable-512.png', './apple-touch-icon.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(VERSION).then((c) => c.addAll(ARCHIVOS))); self.skipWaiting(); });
 self.addEventListener('activate', (e) => {

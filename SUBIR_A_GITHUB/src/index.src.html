@@ -314,14 +314,19 @@ function renderForm(){
           <select data-k="panel.${i}.porFila" style="width:auto;padding:4px 6px">
             <option value="" ${!p.porFila?'selected':''}>Automático</option>${[1,2,3,4,5].map(n => `<option value="${n}" ${+p.porFila===n?'selected':''}>${n}</option>`).join('')}
           </select></label>
-        <span class="hint">${p.fotos.length} foto(s)</span>
+        <label class="layout">Ajuste
+          <select data-k="panel.${i}.ajuste" style="width:auto;padding:4px 6px">
+            <option value="rellenar" ${p.ajuste!=='proporcion'?'selected':''}>Rellenar (sin espacios)</option>
+            <option value="proporcion" ${p.ajuste==='proporcion'?'selected':''}>Mantener proporción</option>
+          </select></label>
+        <span class="hint">${p.fotos.length} foto(s) · se acomodan solas en el recuadro</span>
       </div>
       <textarea data-k="panel.${i}.texto" style="min-height:150px" placeholder="Redacción: describe el trabajo realizado...">${esc(p.texto)}</textarea>
       <div class="hint">Para poner algo en <b>negrita</b> escríbelo entre dos asteriscos: <code>**energía cero**</code>. El recuadro del Excel crece según el largo del texto.</div>
     </div>`).join('')}
     <button class="btn small" data-act="add" data-l="panel">＋ Bloque de fotos</button>
     <button class="btn small" data-act="panelDesdeAct" title="Crea un bloque por cada actividad de mañana y tarde que aún no tenga uno">Crear bloques desde las actividades</button>
-    <p class="hint">Las fotos se ordenan solas dentro del espacio y debajo queda el recuadro de redacción. Las fotos no se guardan en el navegador: agrégalas antes de descargar.</p>
+    <p class="hint">Con «Rellenar» todas las fotos del bloque tienen el mismo tamaño y ocupan todo el espacio (pueden verse un poco estiradas). Debajo queda el recuadro de redacción. Las fotos no se guardan en el navegador: agrégalas antes de descargar.</p>
   </div></section>
 
   <section class="card"><h2>Materiales y equipos utilizados</h2><div class="body">
